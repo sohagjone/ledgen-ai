@@ -26,7 +26,7 @@ def _int(name: str, default: int) -> int:
 
 @dataclass
 class Settings:
-    anthropic_api_key: str
+    groq_api_key: str
     brave_api_key: str
     model: str
     smtp_user: str
@@ -45,8 +45,8 @@ class Settings:
 
     def missing_for_run(self) -> list[str]:
         out = []
-        if not self.anthropic_api_key:
-            out.append("ANTHROPIC_API_KEY")
+        if not self.groq_api_key:
+            out.append("GROQ_API_KEY")
         if not self.brave_api_key:
             out.append("BRAVE_API_KEY")
         return out
@@ -54,9 +54,9 @@ class Settings:
 
 def load_settings() -> Settings:
     return Settings(
-        anthropic_api_key=_get("ANTHROPIC_API_KEY"),
+        groq_api_key=_get("GROQ_API_KEY"),
         brave_api_key=_get("BRAVE_API_KEY"),
-        model=_get("CLAUDE_MODEL", "claude-sonnet-4-6"),
+        model=_get("GROQ_MODEL", "llama-3.3-70b-versatile"),
         smtp_user=_get("SMTP_USER"),
         smtp_password=_get("SMTP_PASSWORD"),
         notify_email=_get("NOTIFY_EMAIL", "sohagjone@gmail.com"),

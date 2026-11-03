@@ -16,11 +16,7 @@ class FakeFetcher:
         return {"ok": True, "text": ARTICLE, "full_text": ARTICLE, "error": ""}
 
 
-class FakeClaude:
-    def __init__(self, *a, **k): pass
-
-
-def fake_qualify(client, model, source, content):
+def fake_qualify(client, api_key, model, source, content):
     return {"is_target_company": True, "company_name": "AnyMind Group", "website": "Not found", "industry": "Adtech",
             "country": "USA", "company_size": "Not found", "contact_name": "Kosuke Sogo", "contact_title": "CEO",
             "business_email": "Not found", "linkedin_url": "Not found", "reason_for_fit": "US launch",
@@ -39,7 +35,6 @@ def fake_search(client, key, query, country=None, count=10, freshness="pm"):
 
 def patch(monkeypatch):
     monkeypatch.setattr(pipeline, "Fetcher", FakeFetcher)
-    monkeypatch.setattr(pipeline.anthropic, "Anthropic", FakeClaude)
     monkeypatch.setattr(pipeline, "qualify", fake_qualify)
     monkeypatch.setattr(pipeline, "brave_search", fake_search)
     monkeypatch.setattr("leadgen.enrich.brave_search", fake_search)
@@ -69,9 +64,9 @@ def test_live_run_stores_then_second_run_skips(monkeypatch, tmp_path):
     assert DB(s.db_path).runs()[0]["qualified"] == 1
 
 
-def test_claude_failure_is_reported_not_fatal(monkeypatch, tmp_path):
+def test_llm_failure_is_reported_not_fatal(monkeypatch, tmp_path):
     patch(monkeypatch)
-    def boom(*a, **k): raise RuntimeError("Claude API error: 400")
+    def boom(*a, **k): raise RuntimeError("Groq API error 400: bad request")
     monkeypatch.setattr(pipeline, "qualify", boom)
     res = pipeline.run_pipeline(settings(db_path=str(tmp_path / "x.db")), live=False, max_queries=1)
     assert res.items[0]["status"] == "error" and any("400" in e for e in res.errors)

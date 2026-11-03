@@ -10,7 +10,7 @@ from leadgen.verify import Known, verify_and_score
 
 
 def settings(**kw):
-    base = dict(anthropic_api_key="k", brave_api_key="b", model="m", smtp_user="", smtp_password="",
+    base = dict(groq_api_key="k", brave_api_key="b", model="m", smtp_user="", smtp_password="",
                 notify_email="x@y.z", sender_name="Me", postal_address="1 Main St", opt_out_line="reply no thanks",
                 min_score=50, draft_min_score=65, max_queries=2, max_candidates=3, max_enrich=3,
                 db_path=":memory:", user_agent="t")

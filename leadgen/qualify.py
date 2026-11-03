@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+import time
 
-import anthropic
+import httpx
 
 SYSTEM_PROMPT = """You are a B2B lead-qualification analyst for an independent market research and business intelligence consultancy. Services offered: market research, competitor analysis, market intelligence, market-entry research, pricing research and business data analysis. Ideal customers: startups and SMEs, marketing and consulting agencies, SaaS and technology companies, e-commerce and consumer brands, businesses expanding into new markets. Priority countries: USA, Canada, Australia, United Kingdom. Priority contact roles: founder, CEO, marketing manager, strategy manager, business development leader.
 
@@ -42,7 +43,8 @@ Return ONLY one JSON object, no markdown fences, with exactly these keys:
  "outreach_body": "70-110 words, plain text, personalised ONLY with verified facts, no flattery, no claims about results, no invented familiarity, ends with a soft question. Empty string if is_target_company is false or verified information is too thin."
 }"""
 
-MAX_CONTENT_CHARS = 12_000
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+MAX_CONTENT_CHARS = 9_000  # keeps each call well inside Groq free-tier tokens-per-minute limits
 
 
 def build_user_prompt(source: dict, content: str) -> str:
@@ -70,19 +72,44 @@ def parse_json(text: str) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def qualify(client: anthropic.Anthropic, model: str, source: dict, content: str) -> dict:
-    """Call Claude and return the parsed JSON. Raises RuntimeError with a readable message on failure."""
-    try:
-        msg = client.messages.create(
-            model=model,
-            max_tokens=3500,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": build_user_prompt(source, content)}],
-        )
-    except anthropic.APIError as exc:
-        raise RuntimeError(f"Claude API error: {exc}") from exc
-    text = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
-    data = parse_json(text)
-    if data is None:
-        raise RuntimeError("Claude response was not valid JSON (possibly truncated)")
-    return data
+def qualify(client: httpx.Client, api_key: str, model: str, source: dict, content: str) -> dict:
+    """Call Groq (OpenAI-compatible chat API, JSON mode) and return the parsed JSON.
+    Retries on rate limits (429) and server errors. Raises RuntimeError with a readable message on failure."""
+    payload = {
+        "model": model,
+        "temperature": 0.2,
+        "max_tokens": 3000,
+        "response_format": {"type": "json_object"},
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": build_user_prompt(source, content)},
+        ],
+    }
+    headers = {"Authorization": f"Bearer {api_key}"}
+    last = ""
+    for attempt in range(5):
+        try:
+            r = client.post(GROQ_URL, json=payload, headers=headers, timeout=60)
+        except httpx.HTTPError as exc:
+            last = str(exc)
+            time.sleep(2 * (attempt + 1))
+            continue
+        if r.status_code == 429 or r.status_code >= 500:
+            last = f"HTTP {r.status_code}"
+            try:
+                wait = float(r.headers.get("retry-after", ""))
+            except ValueError:
+                wait = 2 * (attempt + 1)
+            time.sleep(min(wait, 60))
+            continue
+        if r.status_code >= 400:
+            raise RuntimeError(f"Groq API error {r.status_code}: {r.text[:200]}")
+        try:
+            text = r.json()["choices"][0]["message"]["content"] or ""
+        except (KeyError, IndexError, ValueError) as exc:
+            raise RuntimeError(f"Unexpected Groq response shape: {exc}") from exc
+        data = parse_json(text)
+        if data is None:
+            raise RuntimeError("Groq response was not valid JSON (possibly truncated)")
+        return data
+    raise RuntimeError(f"Groq API failed after retries: {last}")

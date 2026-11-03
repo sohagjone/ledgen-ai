@@ -5,7 +5,6 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Callable
 
-import anthropic
 import httpx
 
 from .db import DB
@@ -54,7 +53,6 @@ def run_pipeline(settings, live: bool = False, max_queries: int | None = None,
 
     http = httpx.Client(timeout=30)
     fetcher = Fetcher(settings.user_agent)
-    claude = anthropic.Anthropic(api_key=settings.anthropic_api_key, max_retries=3)
     try:
         # 1. Discover
         queries = build_queries(max_queries or settings.max_queries)
@@ -88,7 +86,7 @@ def run_pipeline(settings, live: bool = False, max_queries: int | None = None,
             if not page["ok"]:
                 result.errors.append(f"Fetch {src['source_url']}: {page['error']}")
             try:
-                raw = qualify(claude, settings.model, src, page["text"])
+                raw = qualify(http, settings.groq_api_key, settings.model, src, page["text"])
             except RuntimeError as exc:
                 result.errors.append(f"{src['source_url']}: {exc}")
                 result.items.append({**src, "status": "error", "detail": str(exc), "score": 0})

@@ -1,11 +1,11 @@
 # Market Research Lead Generation
 
-Finds companies that may need market research / competitor analysis, qualifies and scores them with Claude,
+Finds companies that may need market research / competitor analysis, qualifies and scores them with an LLM on Groq,
 verifies every contact field against the source text, removes duplicates, and gives you a Streamlit dashboard,
 Excel exports and a daily email summary. **It never sends outreach** - it only drafts messages for your review.
 
 ```
-Brave Search -> normalise/dedupe -> fetch page (robots.txt respected) -> Claude extracts facts
+Brave Search -> normalise/dedupe -> fetch page (robots.txt respected) -> Groq LLM extracts facts
   -> code verifies + scores 0-100 -> look for published business emails on the company's own site
   -> SQLite -> Excel (new leads + master) -> email summary
 ```
@@ -31,7 +31,7 @@ Brave Search -> normalise/dedupe -> fetch page (robots.txt respected) -> Claude 
 ## Keys you need
 | Secret | Required | Where |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | yes | console.anthropic.com |
+| `GROQ_API_KEY` | yes | console.groq.com/keys |
 | `BRAVE_API_KEY` | yes | brave.com/search/api |
 | `APP_PASSWORD` | yes (Streamlit) | choose one |
 | `SMTP_USER`, `SMTP_PASSWORD` | for email | Gmail address + a Google **App Password** (needs 2-step verification) |
@@ -47,7 +47,7 @@ Private repos are supported (you grant Streamlit access to the repo).
 
 **3. Daily run (GitHub Actions).** Streamlit Cloud apps sleep when idle and cannot run on a schedule, so the daily
 job runs in GitHub Actions. Repo -> Settings -> Secrets and variables -> Actions -> add the same secrets
-(`ANTHROPIC_API_KEY`, `BRAVE_API_KEY`, `SMTP_USER`, `SMTP_PASSWORD`, `NOTIFY_EMAIL`, `SENDER_NAME`, `POSTAL_ADDRESS`).
+(`GROQ_API_KEY`, `BRAVE_API_KEY`, `SMTP_USER`, `SMTP_PASSWORD`, `NOTIFY_EMAIL`, `SENDER_NAME`, `POSTAL_ADDRESS`).
 Then Actions -> "Daily lead generation" -> Run workflow (leave "live" unticked for a first dry run).
 Scheduled runs are live: they store leads in `data/leads.db` and commit it back, and Streamlit redeploys with the new data.
 
@@ -76,6 +76,9 @@ Claude Desktop `claude_desktop_config.json`:
 Tools: `run_discovery`, `list_leads`, `export_master_excel`, `set_outreach_status`.
 
 ## Known limits
+- The model is `llama-3.3-70b-versatile` by default (set `GROQ_MODEL` to change it). Open models follow strict
+  instructions a little less reliably than frontier models, which is why every field is re-verified in code. Groq's free
+  tier has per-minute token limits; the code waits and retries on rate-limit (429) responses, so big runs are slower.
 - Contact emails are often `Not found`: most companies hide them behind forms. For reliably verified emails use a
   lawful provider (Hunter, Apollo, ...) with your own key - add it in `leadgen/enrich.py`.
 - Search results are mostly news articles, so leads skew toward companies that make news (often larger than SMEs).

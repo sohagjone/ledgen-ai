@@ -1,4 +1,4 @@
-"""Turn Claude's raw JSON into a verified, scored lead. No model output is trusted blindly:
+"""Turn the model's raw JSON into a verified, scored lead. No model output is trusted blindly:
 emails, names, websites and profile URLs must appear verbatim in the scraped source text."""
 from __future__ import annotations
 
