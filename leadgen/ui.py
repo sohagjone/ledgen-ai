@@ -2,6 +2,7 @@
 All dynamic text is HTML-escaped because it originates from scraped web pages."""
 from __future__ import annotations
 
+import re
 from html import escape as esc
 
 NF = "Not found"
@@ -55,6 +56,11 @@ div[data-testid="stForm"] {background: #fff; border: 1px solid #e3e9f2; border-r
 @media (max-width: 800px) {.kpis {grid-template-columns: repeat(2, 1fr);} .lead {flex-direction: column;}}
 </style>
 """
+
+# Collapse to one line: blank lines inside <style> make Streamlit's markdown renderer print the CSS as text.
+_css_body = CSS.replace("<style>", "").replace("</style>", "")
+CSS = "<style>" + re.sub(r"\s+", " ", _css_body).strip() + "</style>"
+
 
 
 def hero(title: str, subtitle: str, pills: list[str]) -> str:
