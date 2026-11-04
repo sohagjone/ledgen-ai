@@ -11,7 +11,7 @@ from .db import DB
 from .enrich import enrich_lead
 from .qualify import qualify
 from .scrape import Fetcher
-from .search import brave_search, build_queries
+from .search import brave_search, build_queries, describe_focus
 from .util import NF, domain_of, is_blocked, now_iso
 from .verify import Known, verify_and_score
 
@@ -26,6 +26,7 @@ class RunResult:
     items: list[dict] = field(default_factory=list)   # every analysed candidate with its status
     errors: list[str] = field(default_factory=list)
     existing_rows: list[dict] = field(default_factory=list)  # leads stored before this run
+    criteria: dict = field(default_factory=dict)  # what the user searched for
 
     @property
     def qualified(self) -> list[dict]:
@@ -36,7 +37,9 @@ class RunResult:
 
 
 def run_pipeline(settings, live: bool = False, max_queries: int | None = None,
-                 max_candidates: int | None = None, log: Callable[[str], None] = lambda m: None) -> RunResult:
+                 max_candidates: int | None = None, log: Callable[[str], None] = lambda m: None,
+                 industry: str = "", keywords: str = "", countries: list[str] | None = None,
+                 signals: list[str] | None = None) -> RunResult:
     """Discover -> normalise -> scrape -> qualify -> verify/score -> enrich -> (store if live).
     With live=False nothing is written to the database."""
     missing = settings.missing_for_run()
@@ -46,6 +49,8 @@ def run_pipeline(settings, live: bool = False, max_queries: int | None = None,
     db = DB(settings.db_path)
     result = RunResult(run_id=uuid.uuid4().hex[:8], started_at=now_iso(), live=live)
     result.existing_rows = db.leads()
+    result.criteria = {"industry": industry, "keywords": keywords, "countries": countries or [], "signals": signals or []}
+    focus = describe_focus(industry, keywords)
     stored = Known.from_rows(result.existing_rows)
     known = Known.from_rows(result.existing_rows)
     known_urls = db.processed_urls() | {r["source_url"].lower() for r in result.existing_rows if r.get("source_url")}
@@ -55,7 +60,7 @@ def run_pipeline(settings, live: bool = False, max_queries: int | None = None,
     fetcher = Fetcher(settings.user_agent)
     try:
         # 1. Discover
-        queries = build_queries(max_queries or settings.max_queries)
+        queries = build_queries(max_queries or settings.max_queries, industry, keywords, countries, signals)
         result.queries = len(queries)
         candidates: list[dict] = []
         seen: set[str] = set()
@@ -86,7 +91,7 @@ def run_pipeline(settings, live: bool = False, max_queries: int | None = None,
             if not page["ok"]:
                 result.errors.append(f"Fetch {src['source_url']}: {page['error']}")
             try:
-                raw = qualify(http, settings.groq_api_key, settings.model, src, page["text"])
+                raw = qualify(http, settings.groq_api_key, settings.model, src, page["text"], focus)
             except RuntimeError as exc:
                 result.errors.append(f"{src['source_url']}: {exc}")
                 result.items.append({**src, "status": "error", "detail": str(exc), "score": 0})

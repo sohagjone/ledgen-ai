@@ -25,12 +25,19 @@ def main() -> int:
     ap.add_argument("--no-email", action="store_true", help="do not send the summary email")
     ap.add_argument("--max-queries", type=int, default=None)
     ap.add_argument("--max-candidates", type=int, default=None)
+    ap.add_argument("--industry", default="", help="e.g. fintech, e-commerce fashion, HR software")
+    ap.add_argument("--keywords", default="", help="extra search words")
+    ap.add_argument("--countries", default="", help="comma list of US,CA,AU,GB (default: all)")
+    ap.add_argument("--signals", default="", help="comma list of expansion,launch,hiring,funding")
     args = ap.parse_args()
 
     settings = load_settings()
     try:
         result = run_pipeline(settings, live=args.live, max_queries=args.max_queries,
-                              max_candidates=args.max_candidates, log=print)
+                              max_candidates=args.max_candidates, log=print, industry=args.industry,
+                              keywords=args.keywords,
+                              countries=[c.strip().upper() for c in args.countries.split(',') if c.strip()],
+                              signals=[s.strip().lower() for s in args.signals.split(',') if s.strip()])
     except RuntimeError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

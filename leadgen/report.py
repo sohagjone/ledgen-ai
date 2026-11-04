@@ -14,6 +14,10 @@ def build_summary(result, settings) -> tuple[str, str]:
     h = ['<div style="font-family:Arial,sans-serif;font-size:14px;color:#222"><h2>Lead generation daily summary</h2>']
     if not result.live:
         h.append('<p style="background:#fff3cd;padding:8px"><b>TEST / DRY RUN</b> - nothing was stored and no outreach was sent.</p>')
+    c = getattr(result, "criteria", {}) or {}
+    focus = "; ".join(x for x in (f"Industry: {c['industry']}" if c.get("industry") else "",
+                                   f"Keywords: {c['keywords']}" if c.get("keywords") else "") if x) or "General (no industry filter)"
+    h.append(f"<p><b>Search focus:</b> {esc(focus)}</p>")
     h.append(f"<p>Run {esc(result.run_id)} | {esc(result.started_at)}<br>Queries: {result.queries} | "
              f"Search results seen: {result.raw_results} | New sources analysed: {len(result.items)}<br>"
              f"<b>New qualified leads: {len(leads)}</b> | Rejected: {rejected} | Duplicates: {dups} | Errors: {len(errs)}</p>")

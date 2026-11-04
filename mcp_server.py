@@ -19,10 +19,12 @@ mcp = FastMCP("lead-generation")
 
 
 @mcp.tool()
-def run_discovery(live: bool = False, max_queries: int = 2, max_candidates: int = 3) -> str:
-    """Search for new leads, qualify and score them. live=False is a dry run that stores nothing."""
+def run_discovery(industry: str = "", keywords: str = "", live: bool = False, max_queries: int = 2,
+                  max_candidates: int = 3) -> str:
+    """Search for new leads in an industry, qualify and score them. live=False is a dry run that stores nothing."""
     s = load_settings()
-    result = run_pipeline(s, live=live, max_queries=max_queries, max_candidates=max_candidates)
+    result = run_pipeline(s, live=live, max_queries=max_queries, max_candidates=max_candidates,
+                          industry=industry, keywords=keywords)
     log_run(s, result, "not sent (MCP)")
     lines = [f"Run {result.run_id} ({'LIVE' if live else 'dry run'}): {result.count('qualified')} qualified, "
              f"{result.count('duplicate')} duplicates, {result.count('rejected')} rejected, {len(result.errors)} errors"]

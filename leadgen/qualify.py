@@ -47,9 +47,15 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MAX_CONTENT_CHARS = 9_000  # keeps each call well inside Groq free-tier tokens-per-minute limits
 
 
-def build_user_prompt(source: dict, content: str) -> str:
+def build_user_prompt(source: dict, content: str, focus: str = "") -> str:
     status = "scraped" if content else "unavailable - rely on title and snippet only and mark most fields Not found"
+    focus_line = (
+        f"USER SEARCH FOCUS: {focus}. Give a high fit_score only to companies that genuinely match this focus; "
+        "if the company is clearly outside it, score fit low and say so in qualification_notes."
+        if focus else "USER SEARCH FOCUS: none (general)"
+    )
     return "\n".join([
+        focus_line,
         f"SOURCE URL: {source['source_url']}",
         f"SEARCH QUERY THAT SURFACED IT: {source.get('query', '')} (country filter: {source.get('country', '')})",
         f"SEARCH RESULT TITLE: {source.get('title', '')}",
@@ -72,7 +78,7 @@ def parse_json(text: str) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def qualify(client: httpx.Client, api_key: str, model: str, source: dict, content: str) -> dict:
+def qualify(client: httpx.Client, api_key: str, model: str, source: dict, content: str, focus: str = "") -> dict:
     """Call Groq (OpenAI-compatible chat API, JSON mode) and return the parsed JSON.
     Retries on rate limits (429) and server errors. Raises RuntimeError with a readable message on failure."""
     payload = {
@@ -82,7 +88,7 @@ def qualify(client: httpx.Client, api_key: str, model: str, source: dict, conten
         "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_user_prompt(source, content)},
+            {"role": "user", "content": build_user_prompt(source, content, focus)},
         ],
     }
     headers = {"Authorization": f"Bearer {api_key}"}

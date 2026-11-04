@@ -48,3 +48,23 @@ def master_xlsx(existing: list[dict], fresh: list[dict], live: bool) -> bytes:
     tag = "NEW this run" if live else "NEW - TEST (not stored)"
     rows = [{**r, "_tag": tag} for r in fresh] + [{**r, "_tag": "Stored"} for r in existing]
     return to_xlsx(rows, "All Leads", tag_col=True, empty_note="No leads stored yet")
+
+
+def analysis_xlsx(items: list[dict]) -> bytes:
+    """Every page analysed in a run, with outcome and reason - useful to see why leads were rejected."""
+    rows = [{
+        "Outcome": i.get("status", ""), "Reason / detail": i.get("detail", ""), "Score": i.get("score", 0),
+        "Company": i.get("company_name", ""), "Website": i.get("website", ""), "Country": i.get("country", ""),
+        "Business Email": i.get("business_email", ""), "Source URL": i.get("source_url", ""),
+    } for i in items]
+    df = pd.DataFrame(rows) if rows else pd.DataFrame([{"Note": "Nothing analysed"}])
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as xw:
+        df.to_excel(xw, index=False, sheet_name="Analysis")
+        ws = xw.sheets["Analysis"]
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = ws.dimensions
+        for col in ws.columns:
+            longest = max((len(str(c.value)) for c in col if c.value is not None), default=8)
+            ws.column_dimensions[col[0].column_letter].width = min(max(10, longest + 2), 60)
+    return buf.getvalue()

@@ -16,7 +16,7 @@ class FakeFetcher:
         return {"ok": True, "text": ARTICLE, "full_text": ARTICLE, "error": ""}
 
 
-def fake_qualify(client, api_key, model, source, content):
+def fake_qualify(client, api_key, model, source, content, focus=""):
     return {"is_target_company": True, "company_name": "AnyMind Group", "website": "Not found", "industry": "Adtech",
             "country": "USA", "company_size": "Not found", "contact_name": "Kosuke Sogo", "contact_title": "CEO",
             "business_email": "Not found", "linkedin_url": "Not found", "reason_for_fit": "US launch",
@@ -70,3 +70,19 @@ def test_llm_failure_is_reported_not_fatal(monkeypatch, tmp_path):
     monkeypatch.setattr(pipeline, "qualify", boom)
     res = pipeline.run_pipeline(settings(db_path=str(tmp_path / "x.db")), live=False, max_queries=1)
     assert res.items[0]["status"] == "error" and any("400" in e for e in res.errors)
+
+
+def test_user_criteria_flow_through_pipeline(monkeypatch, tmp_path):
+    patch(monkeypatch)
+    seen = {"queries": [], "focus": []}
+    def spy_search(client, key, query, country=None, count=10, freshness="pm"):
+        seen["queries"].append((query, country)); return fake_search(client, key, query, country, count, freshness)
+    def spy_qualify(client, api_key, model, source, content, focus=""):
+        seen["focus"].append(focus); return fake_qualify(client, api_key, model, source, content, focus)
+    monkeypatch.setattr(pipeline, "brave_search", spy_search)
+    monkeypatch.setattr(pipeline, "qualify", spy_qualify)
+    res = pipeline.run_pipeline(settings(db_path=str(tmp_path / "x.db")), live=False, max_queries=5, max_candidates=3,
+                                industry="adtech", keywords="APAC", countries=["AU"], signals=["launch"])
+    assert seen["queries"][0] == ("adtech company launches new product in Australia market entry APAC", "AU")
+    assert seen["focus"] == ["industry = adtech; extra keywords = APAC"]
+    assert res.criteria["industry"] == "adtech"

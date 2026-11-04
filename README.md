@@ -10,6 +10,17 @@ Brave Search -> normalise/dedupe -> fetch page (robots.txt respected) -> Groq LL
   -> SQLite -> Excel (new leads + master) -> email summary
 ```
 
+## Using the app
+1. **Find leads** tab: type an **industry / niche** (e.g. `fintech`, `e-commerce fashion`, `HR software`), optional
+   **extra keywords**, pick **countries** and the **buying signals** to look for (expansion, product launch, hiring
+   strategy/research roles, funding). Your industry drives the search queries *and* the fit score.
+2. Press **Find leads**. Results appear as scored cards (green 75+, amber 60+), with verified facts and assumptions
+   kept separate in each lead's *Details* panel.
+3. **Download Excel** straight from the app after every run: *New leads*, *Master sheet* (all stored + new), and
+   *Full analysis* (every page analysed, including why it was rejected).
+4. **Lead database** tab: search, filter, and download the filtered view or all saved leads.
+5. CLI equivalent: `python run_daily.py --industry fintech --keywords "Series A" --countries CA,GB --signals expansion,funding`
+
 ## Rules built in
 - Only public pages are fetched; `robots.txt` is honoured; 401/403/CAPTCHA pages are skipped, never bypassed.
 - LinkedIn, Crunchbase, ZoomInfo and social sites are never fetched.
